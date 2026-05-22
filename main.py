@@ -1,509 +1,358 @@
-#include <iostream>
-#include <fstream>
-#include <unordered_map>
-#include <vector>
-#include <queue>
-#include <stack>
-#include <set>
-#include <algorithm>
-#include <limits>
-#include <memory>
-#include "nlohmann/json.hpp"
+import json
+from collections import deque
 
-using namespace std;
-using json = nlohmann::json;
 
-class GraphNode {
-public:
-    string name;
+# =========================
+# NODE
+# =========================
+class GraphNode:
+    def __init__(self, name):
+        if not name.strip():
+            raise ValueError("Имя вершины не может быть пустым.")
 
-    GraphNode(const string& value = "") {
-        name = value;
-    }
-};
+        self.name = name
 
-class Graph {
-protected:
-    unordered_map<string, vector<pair<string, int>>> adjacencyList;
+    def __str__(self):
+        return self.name
 
-public:
-    virtual ~Graph() = default;
 
-    void addNode(const string& name) {
-        if (!adjacencyList.count(name)) {
-            adjacencyList[name] = {};
+# =========================
+# EDGE
+# =========================
+class Edge:
+    def __init__(self, from_node, to_node, weight=1):
+        if weight < 0:
+            raise ValueError("Вес не может быть отрицательным.")
+
+        self.from_node = from_node
+        self.to_node = to_node
+        self.weight = weight
+
+
+# =========================
+# ABSTRACT GRAPH
+# =========================
+class Graph:
+    def __init__(self):
+        self.adjacency_list = {}
+
+    # Добавление вершины
+    def add_node(self, node):
+        if not node.strip():
+            raise ValueError("Имя вершины пустое.")
+
+        if node in self.adjacency_list:
+            raise Exception("Вершина уже существует.")
+
+        self.adjacency_list[node] = []
+
+    # Удаление вершины
+    def remove_node(self, node):
+        if node not in self.adjacency_list:
+            raise Exception("Вершина не найдена.")
+
+        del self.adjacency_list[node]
+
+        for edges in self.adjacency_list.values():
+            edges[:] = [e for e in edges if e.to_node != node]
+
+    # Добавление ребра
+    def add_edge(self, from_node, to_node, weight=1):
+        raise NotImplementedError
+
+    # Удаление ребра
+    def remove_edge(self, from_node, to_node):
+        if from_node not in self.adjacency_list:
+            raise Exception("Вершина не найдена.")
+
+        self.adjacency_list[from_node] = [
+            e for e in self.adjacency_list[from_node]
+            if e.to_node != to_node
+        ]
+
+    # Вывод графа
+    def print_graph(self):
+        for node, edges in self.adjacency_list.items():
+            print(f"{node}: ", end="")
+
+            for edge in edges:
+                print(f"-> {edge.to_node}(w:{edge.weight}) ", end="")
+
+            print()
+
+
+# =========================
+# DIRECTED GRAPH
+# =========================
+class DirectedGraph(Graph):
+    def add_edge(self, from_node, to_node, weight=1):
+        if from_node not in self.adjacency_list or \
+           to_node not in self.adjacency_list:
+            raise Exception("Одна из вершин отсутствует.")
+
+        self.adjacency_list[from_node].append(
+            Edge(from_node, to_node, weight)
+        )
+
+
+# =========================
+# UNDIRECTED GRAPH
+# =========================
+class UndirectedGraph(Graph):
+    def add_edge(self, from_node, to_node, weight=1):
+        if from_node not in self.adjacency_list or \
+           to_node not in self.adjacency_list:
+            raise Exception("Одна из вершин отсутствует.")
+
+        self.adjacency_list[from_node].append(
+            Edge(from_node, to_node, weight)
+        )
+
+        self.adjacency_list[to_node].append(
+            Edge(to_node, from_node, weight)
+        )
+
+
+# =========================
+# WEIGHTED GRAPH
+# =========================
+class WeightedGraph(Graph):
+    def add_edge(self, from_node, to_node, weight=1):
+        if weight < 0:
+            raise Exception("Вес не может быть отрицательным.")
+
+        if from_node not in self.adjacency_list or \
+           to_node not in self.adjacency_list:
+            raise Exception("Одна из вершин отсутствует.")
+
+        self.adjacency_list[from_node].append(
+            Edge(from_node, to_node, weight)
+        )
+
+
+# =========================
+# FACTORY
+# =========================
+class GraphFactory:
+    @staticmethod
+    def create_graph(graph_type):
+        graph_type = graph_type.lower()
+
+        if graph_type == "directed":
+            return DirectedGraph()
+
+        elif graph_type == "undirected":
+            return UndirectedGraph()
+
+        elif graph_type == "weighted":
+            return WeightedGraph()
+
+        else:
+            raise Exception("Неизвестный тип графа.")
+
+
+# =========================
+# BFS
+# =========================
+class BFS:
+    @staticmethod
+    def traverse(graph, start):
+        if start not in graph.adjacency_list:
+            raise Exception("Стартовая вершина отсутствует.")
+
+        visited = set()
+        queue = deque()
+        result = []
+
+        visited.add(start)
+        queue.append(start)
+
+        while queue:
+            current = queue.popleft()
+
+            result.append(current)
+
+            for edge in graph.adjacency_list[current]:
+                if edge.to_node not in visited:
+                    visited.add(edge.to_node)
+                    queue.append(edge.to_node)
+
+        return result
+
+
+# =========================
+# DFS
+# =========================
+class DFS:
+    @staticmethod
+    def traverse(graph, start):
+        if start not in graph.adjacency_list:
+            raise Exception("Стартовая вершина отсутствует.")
+
+        visited = set()
+        result = []
+
+        DFS._dfs_recursive(graph, start, visited, result)
+
+        return result
+
+    @staticmethod
+    def _dfs_recursive(graph, current, visited, result):
+        visited.add(current)
+        result.append(current)
+
+        for edge in graph.adjacency_list[current]:
+            if edge.to_node not in visited:
+                DFS._dfs_recursive(
+                    graph,
+                    edge.to_node,
+                    visited,
+                    result
+                )
+
+
+# =========================
+# DIJKSTRA
+# =========================
+class Dijkstra:
+    @staticmethod
+    def find_shortest_paths(graph, start):
+        if start not in graph.adjacency_list:
+            raise Exception("Стартовая вершина отсутствует.")
+
+        distances = {
+            node: float("inf")
+            for node in graph.adjacency_list
         }
-    }
 
-    void removeNode(const string& name) {
-        if (!adjacencyList.count(name)) {
-            cout << "Vertex not found\n";
-            return;
-        }
+        distances[start] = 0
 
-        adjacencyList.erase(name);
+        visited = set()
 
-        for (auto& item : adjacencyList) {
-            auto& edges = item.second;
+        while len(visited) < len(graph.adjacency_list):
 
-            edges.erase(
-                remove_if(
-                    edges.begin(),
-                    edges.end(),
-                    [&](const pair<string, int>& edge) {
-                        return edge.first == name;
-                    }
+            current = min(
+                (
+                    node for node in distances
+                    if node not in visited
                 ),
-                edges.end()
-            );
-        }
-    }
-
-    virtual void addEdge(
-        const string& from,
-        const string& to,
-        int weight = 1
-    ) = 0;
-
-    virtual void removeEdge(
-        const string& from,
-        const string& to
-    ) = 0;
-
-    void bfs(const string& start) {
-        if (!adjacencyList.count(start)) {
-            cout << "Vertex not found\n";
-            return;
-        }
-
-        set<string> visited;
-        queue<string> q;
-
-        visited.insert(start);
-        q.push(start);
-
-        cout << "BFS: ";
-
-        while (!q.empty()) {
-            string current = q.front();
-            q.pop();
-
-            cout << current << " ";
-
-            for (const auto& neighbor : adjacencyList[current]) {
-                if (!visited.count(neighbor.first)) {
-                    visited.insert(neighbor.first);
-                    q.push(neighbor.first);
-                }
-            }
-        }
-
-        cout << "\n";
-    }
-
-    void dfs(const string& start) {
-        if (!adjacencyList.count(start)) {
-            cout << "Vertex not found\n";
-            return;
-        }
-
-        set<string> visited;
-        stack<string> st;
-
-        st.push(start);
-
-        cout << "DFS: ";
-
-        while (!st.empty()) {
-            string current = st.top();
-            st.pop();
-
-            if (visited.count(current)) {
-                continue;
-            }
-
-            visited.insert(current);
-            cout << current << " ";
-
-            for (
-                auto it = adjacencyList[current].rbegin();
-                it != adjacencyList[current].rend();
-                ++it
-            ) {
-                if (!visited.count(it->first)) {
-                    st.push(it->first);
-                }
-            }
-        }
-
-        cout << "\n";
-    }
-
-    void shortestPathBFS(
-        const string& start,
-        const string& end
-    ) {
-        if (
-            !adjacencyList.count(start) ||
-            !adjacencyList.count(end)
-        ) {
-            cout << "Vertex not found\n";
-            return;
-        }
-
-        unordered_map<string, bool> visited;
-        unordered_map<string, string> parent;
-
-        queue<string> q;
-
-        visited[start] = true;
-        q.push(start);
-
-        while (!q.empty()) {
-            string current = q.front();
-            q.pop();
-
-            for (const auto& neighbor : adjacencyList[current]) {
-                if (!visited[neighbor.first]) {
-                    visited[neighbor.first] = true;
-                    parent[neighbor.first] = current;
-                    q.push(neighbor.first);
-                }
-            }
-        }
-
-        if (!visited[end]) {
-            cout << "Path not found\n";
-            return;
-        }
+                key=lambda node: distances[node]
+            )
 
-        vector<string> path;
+            visited.add(current)
 
-        string current = end;
+            for edge in graph.adjacency_list[current]:
 
-        while (current != start) {
-            path.push_back(current);
-            current = parent[current];
-        }
+                new_distance = (
+                    distances[current] + edge.weight
+                )
 
-        path.push_back(start);
+                if new_distance < distances[edge.to_node]:
+                    distances[edge.to_node] = new_distance
 
-        reverse(path.begin(), path.end());
+        return distances
 
-        cout << "Shortest BFS path: ";
 
-        for (const auto& node : path) {
-            cout << node << " ";
-        }
-
-        cout << "\n";
-    }
-
-    void dijkstra(
-        const string& start,
-        const string& end
-    ) {
-        if (
-            !adjacencyList.count(start) ||
-            !adjacencyList.count(end)
-        ) {
-            cout << "Vertex not found\n";
-            return;
-        }
+# =========================
+# JSON SERIALIZER
+# =========================
+class GraphSerializer:
 
-        unordered_map<string, int> distance;
-        unordered_map<string, string> parent;
+    @staticmethod
+    def save(graph, path):
+        data = {}
 
-        for (const auto& item : adjacencyList) {
-            distance[item.first] = numeric_limits<int>::max();
-        }
+        for node, edges in graph.adjacency_list.items():
+            data[node] = []
 
-        distance[start] = 0;
+            for edge in edges:
+                data[node].append({
+                    "to": edge.to_node,
+                    "weight": edge.weight
+                })
 
-        priority_queue<
-            pair<int, string>,
-            vector<pair<int, string>>,
-            greater<pair<int, string>>
-        > pq;
+        with open(path, "w", encoding="utf-8") as file:
+            json.dump(data, file, indent=4, ensure_ascii=False)
 
-        pq.push({0, start});
+    @staticmethod
+    def load(path):
+        with open(path, "r", encoding="utf-8") as file:
+            return json.load(file)
 
-        while (!pq.empty()) {
-            auto currentData = pq.top();
-            pq.pop();
 
-            int currentDistance = currentData.first;
-            string currentNode = currentData.second;
+# =========================
+# PROGRAM
+# =========================
+def main():
 
-            if (currentDistance > distance[currentNode]) {
-                continue;
-            }
+    print("=== GRAPH NAVIGATOR ===")
 
-            for (const auto& neighbor : adjacencyList[currentNode]) {
-                int newDistance =
-                    currentDistance + neighbor.second;
+    try:
 
-                if (newDistance < distance[neighbor.first]) {
-                    distance[neighbor.first] = newDistance;
-                    parent[neighbor.first] = currentNode;
+        # Создание графа через Factory
+        graph = GraphFactory.create_graph("weighted")
 
-                    pq.push({
-                        newDistance,
-                        neighbor.first
-                    });
-                }
-            }
-        }
+        # Добавление вершин
+        graph.add_node("A")
+        graph.add_node("B")
+        graph.add_node("C")
+        graph.add_node("D")
+        graph.add_node("E")
 
-        if (
-            distance[end] ==
-            numeric_limits<int>::max()
-        ) {
-            cout << "Path not found\n";
-            return;
-        }
-
-        vector<string> path;
-
-        string current = end;
-
-        while (current != start) {
-            path.push_back(current);
-            current = parent[current];
-        }
-
-        path.push_back(start);
-
-        reverse(path.begin(), path.end());
-
-        cout << "Dijkstra path: ";
-
-        for (const auto& node : path) {
-            cout << node << " ";
-        }
-
-        cout << "\nDistance: "
-             << distance[end]
-             << "\n";
-    }
-
-    void saveToJson(const string& filename) {
-        json j;
-
-        for (const auto& item : adjacencyList) {
-            for (const auto& edge : item.second) {
-                j[item.first].push_back({
-                    {"to", edge.first},
-                    {"weight", edge.second}
-                });
-            }
-        }
-
-        ofstream file(filename);
-
-        file << j.dump(4);
-
-        file.close();
-    }
-
-    void loadFromJson(const string& filename) {
-        ifstream file(filename);
-
-        if (!file.is_open()) {
-            cout << "File not found\n";
-            return;
-        }
-
-        json j;
-        file >> j;
-
-        adjacencyList.clear();
-
-        for (auto& element : j.items()) {
-            string node = element.key();
-
-            adjacencyList[node] = {};
-
-            for (const auto& edge : element.value()) {
-                adjacencyList[node].push_back({
-                    edge["to"],
-                    edge["weight"]
-                });
-            }
-        }
-
-        file.close();
-    }
-
-    void printGraph() {
-        cout << "Graph:\n";
-
-        for (const auto& item : adjacencyList) {
-            cout << item.first << ": ";
-
-            for (const auto& edge : item.second) {
-                cout
-                    << "("
-                    << edge.first
-                    << ", "
-                    << edge.second
-                    << ") ";
-            }
-
-            cout << "\n";
-        }
-    }
-};
-
-class DirectedGraph : public Graph {
-public:
-    void addEdge(
-        const string& from,
-        const string& to,
-        int weight = 1
-    ) override {
-        if (weight < 0) {
-            cout << "Invalid weight\n";
-            return;
-        }
-
-        addNode(from);
-        addNode(to);
-
-        adjacencyList[from].push_back({
-            to,
-            weight
-        });
-    }
-
-    void removeEdge(
-        const string& from,
-        const string& to
-    ) override {
-        auto& edges = adjacencyList[from];
-
-        edges.erase(
-            remove_if(
-                edges.begin(),
-                edges.end(),
-                [&](const pair<string, int>& edge) {
-                    return edge.first == to;
-                }
-            ),
-            edges.end()
-        );
-    }
-};
-
-class UndirectedGraph : public Graph {
-public:
-    void addEdge(
-        const string& from,
-        const string& to,
-        int weight = 1
-    ) override {
-        if (weight < 0) {
-            cout << "Invalid weight\n";
-            return;
-        }
-
-        addNode(from);
-        addNode(to);
-
-        adjacencyList[from].push_back({
-            to,
-            weight
-        });
-
-        adjacencyList[to].push_back({
-            from,
-            weight
-        });
-    }
-
-    void removeEdge(
-        const string& from,
-        const string& to
-    ) override {
-        auto& first = adjacencyList[from];
-        auto& second = adjacencyList[to];
-
-        first.erase(
-            remove_if(
-                first.begin(),
-                first.end(),
-                [&](const pair<string, int>& edge) {
-                    return edge.first == to;
-                }
-            ),
-            first.end()
-        );
-
-        second.erase(
-            remove_if(
-                second.begin(),
-                second.end(),
-                [&](const pair<string, int>& edge) {
-                    return edge.first == from;
-                }
-            ),
-            second.end()
-        );
-    }
-};
-
-class WeightedGraph : public UndirectedGraph {
-};
-
-class GraphFactory {
-public:
-    static unique_ptr<Graph> createGraph(
-        const string& type
-    ) {
-        if (type == "directed") {
-            return make_unique<DirectedGraph>();
-        }
-
-        if (type == "undirected") {
-            return make_unique<UndirectedGraph>();
-        }
-
-        if (type == "weighted") {
-            return make_unique<WeightedGraph>();
-        }
-
-        return nullptr;
-    }
-};
-
-int main() {
-    unique_ptr<Graph> graph =
-        GraphFactory::createGraph("weighted");
-
-    graph->addEdge("A", "B", 4);
-    graph->addEdge("A", "C", 2);
-    graph->addEdge("B", "D", 5);
-    graph->addEdge("C", "D", 1);
-    graph->addEdge("D", "E", 3);
-
-    graph->printGraph();
-
-    graph->bfs("A");
-
-    graph->dfs("A");
-
-    graph->shortestPathBFS("A", "E");
-
-    graph->dijkstra("A", "E");
-
-    graph->saveToJson("graph.json");
-
-    unique_ptr<Graph> loadedGraph =
-        GraphFactory::createGraph("weighted");
-
-    loadedGraph->loadFromJson("graph.json");
-
-    loadedGraph->printGraph();
-
-    return 0;
-}
+        # Добавление рёбер
+        graph.add_edge("A", "B", 4)
+        graph.add_edge("A", "C", 2)
+        graph.add_edge("B", "D", 5)
+        graph.add_edge("C", "D", 1)
+        graph.add_edge("D", "E", 3)
+
+        # Вывод графа
+        print("\nГРАФ:")
+        graph.print_graph()
+
+        # BFS
+        print("\nBFS:")
+        bfs_result = BFS.traverse(graph, "A")
+        print(" -> ".join(bfs_result))
+
+        # DFS
+        print("\nDFS:")
+        dfs_result = DFS.traverse(graph, "A")
+        print(" -> ".join(dfs_result))
+
+        # Дейкстра
+        print("\nКРАТЧАЙШИЕ ПУТИ (ДЕЙКСТРА):")
+
+        distances = Dijkstra.find_shortest_paths(graph, "A")
+
+        for node, distance in distances.items():
+            print(f"До {node}: {distance}")
+
+        # Сохранение JSON
+        print("\nСОХРАНЕНИЕ В JSON...")
+        GraphSerializer.save(graph, "graph.json")
+
+        print("Граф сохранён в graph.json")
+
+        # Загрузка JSON
+        print("\nЗАГРУЗКА ИЗ JSON:")
+
+        loaded = GraphSerializer.load("graph.json")
+
+        print(json.dumps(
+            loaded,
+            indent=4,
+            ensure_ascii=False
+        ))
+
+        print("\nПрограмма завершена.")
+
+    except Exception as error:
+        print(f"Ошибка: {error}")
+
+
+# =========================
+# START
+# =========================
+if __name__ == "__main__":
+    main()
